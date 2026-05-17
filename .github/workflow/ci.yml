@@ -10,7 +10,6 @@ on:
       - 'requirements/**'
   pull_request:
     branches: [ main ]
-
 jobs:
 
   requirements:
