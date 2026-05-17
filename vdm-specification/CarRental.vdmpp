@@ -1,0 +1,42 @@
+
+
+  VehicleStatus = <Available> | <Booked> | <Maintenance> | <Retired>;
+
+  CustomerId = token;
+  VehicleId = token;
+  BookingId = token;
+
+  CarStatus = <Available> | <Booked> | <Maintenance>;
+  Car :: regNum: seq of char;
+  Date :: day: nat, month: nat, year: nat;
+  Booking :: custId: seq of char, carReg: seq of char, start: Date, end: Date;
+
+  
+state CarRental of
+  cars: map seq of char to CarStatus
+  bookings: set of Booking
+init s == s = mk_CarRental({|->}, {|->})
+end
+
+
+operations:
+  MakeBooking(custId: seq of char, carReg: seq of char, startDate: Date, endDate: Date)
+  ext wr cars: map seq of char to CarStatus
+      wr bookings: set of Booking
+  pre carReg in set dom cars and cars(carReg) = <Available>
+      and startDate.day < endDate.day
+      and not exists b in set bookings &
+             b.carReg = carReg and
+             (startDate.day <= b.end.day and b.start.day <= endDate.day)
+  post cars = mu(cars~, carReg |-> <Booked>) and
+       bookings = bookings~ union {mk_Booking(custId, carReg, startDate, endDate)}
+
+
+       vdm
+  ReturnCar(custId: seq of char, carReg: seq of char)
+  ext wr cars: map seq of char to CarStatus
+      wr bookings: set of Booking
+  pre carReg in set dom cars and cars(carReg) = <Booked>
+      and exists b in set bookings & b.carReg = carReg and b.custId = custId
+  post cars = mu(cars~, carReg |-> <Available>) and
+       bookings = bookings~ \ { b | b in set bookings~ & b.carReg = carReg }

@@ -1,0 +1,97 @@
+name: SVV Verification Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'z-model/**'
+      - 'vdm-spec/**'
+      - 'alloy-model/**'
+      - 'requirements/**'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  requirements:
+    name: Requirements Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SRS exists
+        run: |
+          if [ ! -f "requirements/SRS.md" ]; then
+            echo "SRS missing" && exit 1
+          fi
+          echo "Requirements count: $(grep -c 'FR-' requirements/SRS.md)"
+
+  z-model:
+    name: Z Notation Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Count invariants and operations
+        run: |
+          inv=$(grep -c "Invariant\|INV-" z-model/*.zed 2>/dev/null || echo 0)
+          ops=$(grep -c "Δ\|Ξ" z-model/*.zed 2>/dev/null || echo 0)
+          echo "Invariants: $inv | Operations: $ops"
+          if [ "$inv" -lt 2 ] || [ "$ops" -lt 2 ]; then
+            echo "Minimum 2 invariants and 2 operations required" && exit 1
+          fi
+
+  vdm-spec:
+    name: VDM Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Count pre/post conditions
+        run: |
+          pre=$(grep -c "pre " vdm-spec/*.vdmsl 2>/dev/null || echo 0)
+          post=$(grep -c "post " vdm-spec/*.vdmsl 2>/dev/null || echo 0)
+          echo "Pre: $pre | Post: $post"
+          if [ "$pre" -lt 2 ] || [ "$post" -lt 2 ]; then
+            echo "Minimum 2 pre/post pairs required" && exit 1
+          fi
+
+  alloy:
+    name: Alloy Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Count assertions
+        run: |
+          count=$(grep -c "^assert " alloy-model/*.als 2>/dev/null || echo 0)
+          echo "Assertions: $count"
+          if [ "$count" -lt 5 ]; then
+            echo "Minimum 5 assertions required" && exit 1
+          fi
+      - name: Check counterexample report
+        run: |
+          if [ ! -f "alloy-model/counterexample-report.md" ]; then
+            echo "Counterexample report missing" && exit 1
+          fi
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: 'http://testapp:8080'
+          fail_action: 'warn'
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  validation:
+    name: Validation Report
+    runs-on: ubuntu-latest
+    needs: [z-model, vdm-spec, alloy]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check validation results
+        run: |
+          pass=$(grep -c "PASS" validation/validation-checklist.md 2>/dev/null || echo 0)
+          fail=$(grep -c "FAIL" validation/validation-checklist.md 2>/dev/null || echo 0)
+          echo "Passed: $pass | Failed: $fail"
+
+ 

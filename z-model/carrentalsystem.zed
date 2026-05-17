@@ -1,0 +1,111 @@
+[CUSTOMER, VEHICLE]
+
+
+CarRentalSystem
+──────────────────────────────────────────────────
+
+customers: ℙ CUSTOMER
+vehicles: ℙ VEHICLE
+vehicleStatus: VEHICLE → VEHICLE_STATUS
+bookingCustomer: BOOKING_ID → CUSTOMER
+bookingVehicle: BOOKING_ID → VEHICLE
+bookingPickup: BOOKING_ID → DATE
+bookingReturn: BOOKING_ID → DATE
+bookingActive: BOOKING_ID → Boolean
+dailyRate: VEHICLE → ℝ
+odometerReading: VEHICLE → ℕ
+lastServiceOdometer: VEHICLE → ℕ
+securityDeposit: BOOKING_ID → ℝ
+
+── Invariants ──
+
+dom vehicleStatus = vehicles
+dom dailyRate = vehicles
+dom odometerReading = vehicles
+dom lastServiceOdometer = vehicles
+dom bookingVehicle ⊆ vehicles
+dom bookingCustomer ⊆ customers
+
+∀ b: BOOKING_ID •
+bookingActive(b) = True ⇒
+vehicleStatus(bookingVehicle(b)) = Booked
+
+∀ v: VEHICLE •
+vehicleStatus(v) = Booked ⇒
+∃ b: BOOKING_ID •
+bookingVehicle(b) = v ∧
+bookingActive(b) = True
+
+∀ b: BOOKING_ID •
+bookingReturn(b) > bookingPickup(b)
+
+
+
+CompleteMaintenance
+───────────────────
+ΔCarRentalSystem
+vehicle?: VEHICLE
+vehicle? ∈ vehicles
+vehicleStatus(vehicle?) = Maintenance
+vehicleStatus'(vehicle?) = Available
+
+
+SendToMaintenance
+─────────────────
+ΔCarRentalSystem
+vehicle?: VEHICLE
+vehicle? ∈ vehicles
+vehicleStatus(vehicle?) ≠ Booked
+vehicleStatus'(vehicle?) = Maintenance
+
+
+
+ReturnVehicle
+─────────────
+ΔCarRentalSystem
+bookingId?: BOOKING_ID
+bookingId? ∈ dom bookingVehicle
+bookingActive(bookingId?) = True
+vehicleStatus(bookingVehicle(bookingId?)) = Booked
+vehicleStatus'(bookingVehicle(bookingId?)) = Available
+bookingActive' = bookingActive ⊕ {bookingId? ↦ False}
+
+
+ReturnVehicle
+─────────────
+ΔCarRentalSystem
+bookingId?: BOOKING_ID
+bookingId? ∈ dom bookingVehicle
+bookingActive(bookingId?) = True
+vehicleStatus(bookingVehicle(bookingId?)) = Booked
+vehicleStatus'(bookingVehicle(bookingId?)) = Available
+bookingActive' = bookingActive ⊕ {bookingId? ↦ False}
+
+
+
+CustomerEligibility
+───────────────────
+CarRentalSystem
+∀ b: BOOKING_ID | bookingActive(b) = True •
+bookingCustomer(b) ∈ customers
+
+MaintenanceExclusion
+────────────────────
+CarRentalSystem
+∀ b: BOOKING_ID | bookingActive(b) = True •
+vehicleStatus(bookingVehicle(b)) ≠ Maintenance
+∀ v: VEHICLE | vehicleStatus(v) = Maintenance •
+¬ ∃ b: BOOKING_ID • bookingVehicle(b) = v ∧
+bookingActive(b) = True
+
+
+NoOverlappingBookings
+─────────────────────
+CarRentalSystem
+∀ b1, b2: BOOKING_ID |
+b1 ≠ b2 ∧
+bookingVehicle(b1) = bookingVehicle(b2) ∧
+bookingActive(b1) = True ∧
+bookingActive(b2) = True •
+¬ (bookingPickup(b1) ≤ bookingReturn(b2) ∧
+bookingPickup(b2) ≤ bookingReturn(b1))
